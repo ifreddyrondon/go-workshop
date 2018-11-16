@@ -3,7 +3,7 @@
 
 ## Roadmap
 
-1. Class: [link](https://talks.godoc.org/github.com/ifreddyrondon/go-workshop/santiago-nov2018/go-day1.slide#1 "Why Go? and Go basics")
+1. Class: [Why Go? and Go basics](https://talks.godoc.org/github.com/ifreddyrondon/go-workshop/santiago-nov2018/go-day1.slide#1)
    * Design philosophy.
    * Hello World! and basics.
 2. Class: Memory
