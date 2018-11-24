@@ -1,0 +1,278 @@
+Golang workshop - Santiago
+Day 2 🤓
+24 Nov 2018
+Tags: Go, workshop
+
+Freddy Rondón
+Software Developer, Mercadolibre
+freddy.rondon@mercadolibre.cl
+https://github.com/ifreddyrondon/
+@ifreddyrondon
+
+* WIFI
+
+RED -> Guest
+Usuario / Password
+guest_Meli / Meli01*
+guest_Meli2 / Meli02*
+guest_Meli3 / Meli03*
+guest_Meli4 / Meli04*
+
+* Presentación
+
+https://bit.ly/2DyiG5x
+
+* Structs
+
+  type Point struct {
+    X, Y int
+  }
+
+  var (
+    p1 = Point{1, 2}  // has type Point
+    p2 = Point{X: 1}  // Y:0 is implicit
+    p3 = Point{}      // X:0 and Y:0
+    pp = &Point{1, 2} // has type *Point
+  )
+
+* Punteros
+
+Un puntero es una variable. Pero es un tipo especial de variable porque los datos que almacena no son simplemente cualquier valor normal como un entero simple o un string, es una dirección de memoria de otra variable.
+
+*&*: se utiliza para devolver la referencia de una variable inicializada, ademas nos permite inicializar atributos en variables complejas:
+
+  type Dog struct {
+    Name string
+    Age  int
+  }
+  d := &Dog{Name: "Tom", Age: 14}
+
+
+* Structs y Punteros
+
+Go, como C pero a diferencia de Java, nos da el control sobre lo que es y no es un puntero.
+
+.image ./resources/godata1a.png _ _
+
+* Structs - Attributos
+
+Los atributos en una struct se colocan lado a lado en memoria.
+
+  type Rect1 struct { Min, Max Point }
+  type Rect2 struct { Min, Max *Point }
+
+.image ./resources/godata1b.png _ _
+
+* String
+
+Los strings son en realidad una struct...
+
+.image ./resources/godata2.png _ _
+
+Son inmutables, es seguro que varios string compartan el mismo almacenamiento, por lo que cortar s da como resultado una nueva estructura de 2 palabras con un puntero y una longitud potencialmente diferentes que aún se refieren a la misma secuencia de bytes.
+
+Esto significa que la segmentación se puede hacer sin asignación o copia, lo que hace que los cortes de string sean tan eficientes como pasar los índices explícitos.
+
+* Creando tipos -> New and Make
+
+*make*: built-in func que se usa únicamente para allocar e inicializar slices, maps o channels. Se pasa el tipo, el tamaño y la capacidad. Como resultado obtenemos una variable, no un puntero.
+
+  slice := make([]int, 0, 10)
+
+*new*: built-in func que se usa para allocar memoria, retorna un puntero al valor allocado con zero value.
+
+  someVar := new(int)
+
+* New and Make
+
+.image ./resources/godata4.png 550 _
+
+* LET'S PLAY
+
+.image ./resources/lets_play.gif 500 _
+
+* Jugando con punteros 0
+
+.play -edit ./resources/src/06_pointers/main.go /START/,/END/
+
+* Jugando con punteros 1
+
+.play -edit ./resources/src/06_pointers/1/main.go /START/,/END/
+
+* Jugando con punteros 2
+
+.play -edit ./resources/src/06_pointers/2/main.go /START/,/END/
+
+* Jugando con punteros 3
+
+.play -edit ./resources/src/06_pointers/3/main.go /START/,/END/
+
+* What?
+
+.image ./resources/whats.gif
+
+* Jugando con punteros 4
+
+.play -edit ./resources/src/06_pointers/4/main.go /START/,/END/
+
+* Representación de un puntero
+
+.image ./resources/pointer_representation.jpg
+.caption [[https://www.callicoder.com/golang-pointers/][https://www.callicoder.com/golang-pointers/]]
+
+* Jugando con punteros 5
+
+.play -edit ./resources/src/06_pointers/5/main.go /START/,/END/
+
+* Otros tipo de datos
+
+.code ./resources/src/07_types/main.go /START OMIT/,/END SECTION1/
+
+* Otros tipo de datos - Métodos
+
+.code ./resources/src/07_types/main.go /END SECTION1/,/END C_METHODS/
+.code ./resources/src/07_types/main.go /END C_METHODS/,/END SECTION2/
+
+* Otros tipo de datos - continuación
+
+.play ./resources/src/07_types/main.go /^func main/,/^}/
+
+* Structs - Métodos
+
+  type Tree struct {
+    value       int
+    left, right *Tree
+  }
+
+  func Add(t *Tree, value int) *Tree {
+    if t == nil {
+      aux := Tree{value: value}
+      return &aux
+    }
+    if value == t.value {
+      return t
+    }
+    if value < t.value {
+      t.left = Add(t.left, value)
+    } else {
+      t.right = Add(t.right, value)
+    }
+    return t
+  }
+
+* Collections - Array
+
+.play ./resources/src/09_collections/1/main.go /START/,/END/
+
+* Collections - Slice
+
+  months := []string{1: "January", /* ... */, 12: "December"}
+  q2, summer := months[4:7], months[6:9]
+  fmt.Println(q2, summer) // ["April" "May" "June"] ["June" "July"
+
+.image ./resources/slices.png _ _
+
+* Collections - Slice manipulation
+
+.play -edit ./resources/src/09_collections/2/main.go /START/,/END/
+
+.caption [[https://github.com/golang/go/wiki/SliceTricks][SliceTricks]]
+
+* Collections - Map
+
+.play -edit ./resources/src/09_collections/3/main.go /START/,/END/
+
+* Funciones como valores
+
+.play -edit ./resources/src/10_functions_as_values/main.go /START/,/END/
+
+* 3º Ejercicio (struct, punteros, slices)
+
+Hacer un programa que reciba por parametro una lista de enteros, los almacene en un slice, popule un arbol binario y despues imprima los valores en orden ascendente.
+
+*bonus* : usar funciones como valores.
+
+* Interfaces
+
+Una interfaz es dos cosas: es un conjunto de métodos, pero también es un tipo. Centrémonos primero en el aspecto del conjunto de métodos.
+
+.code ./resources/src/11_interfaces/1/main.go /START SUPERHERO/,/END SUPERHERO/
+
+.image ./resources/stan_lee.gif
+
+* Interfaces - Métodos
+
+Para implementar una interfaz en Go, solo necesitamos implementar todos los métodos en la interfaz
+
+.play -edit ./resources/src/11_interfaces/1/main.go /END SUPERHERO/,/END/
+
+* Interfaces continuación
+
+.play ./resources/src/11_interfaces/2/main.go /START/,/END/
+
+* Composition
+
+.play -edit ./resources/src/12_composition/1/main.go /START/,/END/
+
+* Composition continuación
+
+.play ./resources/src/12_composition/2/main.go /START/,/END/
+
+* Interfaces - Tipo
+
+- interface{} o (interfaz vacía)
+- Fuente de muchas confusiones.
+- Interfaz que no tiene métodos.
+- Todos los tipos la implementan ya que la satisfacen.
+- La implementación de una interfaz se realiza automáticamente.
+- Si escribe una función que toma un valor de interface{} como parámetro, puede recibir cualquier valor.
+
+.play ./resources/src/11_interfaces/3/main.go /START/,/END/
+
+* Testing
+
+Golang tiene un built-in testing framework
+
+Esté es provisto mediante el package testing
+
+Todo file Go con el suffix *_test.go* es considerado un test suite en Go
+
+En cada test suite podemos correr:
+  - Test
+  - Benchmarks
+  - Examples
+
+* Testing continuación
+
+Cada func TestXxx es un test en la suite de tests
+
+Cada func BenchmarkXxx es un benchmark en la suite de tests
+
+Cada func ExampleXxx es un ejemplo en la suite de tests
+
+White box testing / Black box testing
+
+El comando *go* *test* corre los test del proyecto
+
+* Algunos recursos interesantes
+
+.link https://research.swtch.com/godata Go Data Structures.
+.link http://jordanorelli.com/post/32665860244/how-to-use-interfaces-in-go How to use interfaces in Go.
+
+Testing: Not native frameworks
+
+- [[https://github.com/stretchr/testify][Testify]]
+- [[https://github.com/franela/goblin][Goblin]]
+- [[https://github.com/onsi/ginkgo][Ginkgo]]
+- [[https://github.com/smartystreets/goconvey][GoConvey]]
+- [[https://github.com/gavv/httpexpect][httpexpect]]
+
+* 4º Ejercicio
+
+Modelar la funcionalidad para un sistema de cines que calcule los ingresos netos de una función en base a los asistentes y al precio base de la entrada. Existen tres tipos de asistentes y tienen las siguientes características:
+
+- Normales: Pagan el 100%
+- Jubilados: Tienen un 50% de descuento
+- Invitados: No pagan nada
+
+*bonus* : agregar test.
