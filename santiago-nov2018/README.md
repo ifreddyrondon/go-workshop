@@ -10,7 +10,7 @@
    * Pointers
    * Data types.
    * Testing.
-3. Class: Concurrency and APIs
+3. Class: [Concurrency and APIs](https://talks.godoc.org/github.com/ifreddyrondon/go-workshop/santiago-nov2018/go-day3.slide#1)
    * Error handling.
    * Goroutines.
    * APIs.
