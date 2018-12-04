@@ -1,0 +1,522 @@
+Golang workshop - Santiago
+Day 3 🤓
+01 Dec 2018
+Tags: Go, workshop
+
+Freddy Rondón
+Software Developer, Mercadolibre
+freddy.rondon@mercadolibre.cl
+https://github.com/ifreddyrondon/
+@ifreddyrondon
+
+* WIFI
+
+RED -> Guest
+Usuario / Password
+guest_Meli / Meli01*
+guest_Meli2 / Meli02*
+guest_Meli3 / Meli03*
+guest_Meli4 / Meli04*
+
+* Presentación
+
+https://bit.ly/2DyiG5x
+
+* ¿Qué son los errores?
+
+Los errors en Go son otro tipo de valor y estan representados por el built-in error.
+
+  errors.New("soy un error")
+
+.image ./resources/error.gif _ _
+
+* Errors
+
+Si una función o método devuelve un error, entonces, por convención, tiene que ser el último valor devuelto por la función.
+
+  func Open(name string) (file *File, err error)
+
+Se compara contra *nil* para saber si existe un error.
+
+.play -edit ./resources/src/14_errors/1/main.go  /START/,/END/
+
+* Errors internamente
+
+Representación interna
+
+  type error interface {
+      Error() string
+  }
+
+Cualquier tipo que implemente error puede ser usado como error.
+
+.play -edit ./resources/src/14_errors/2/main.go  /START/,/END/
+
+* Manejo de errores
+
+.image ./resources/error_handler.png 300 _
+
+_¿Cómo_se_pueden_tomar_decisiones_dependiendo_del_tipo_de-error?_
+
+Qué sucede si necesito notificar un usuario si ocurrió un error al procesar su pago.
+
+* 0. Enfoque ingenuo
+
+Comparando el contenido del error
+
+.play -edit ./resources/src/14_errors/0/main.go  /START/,/END/
+
+* 1. Sentinel errors
+
+  var ErrFailedPayment = errors.New("payment failed")
+
+Esta función devuelve un error `ErrFailedPayment` cuando el pago falla.
+
+.play -edit ./resources/src/14_errors/4/main.go  /START/,/END/
+
+- Indican que tipo de error ha pasado.
+- Son fáciles de manejar, ya que se basan en una simple igualdad de valores.
+
+* Desventajas de Sentinel errors
+
+*Desventajas*
+
+Carecen de contexto, algunas veces se necesita más información para manejar el error.
+
+_¿Qué_pasaría_si_necesitamos_el_monto_del_pago_que_falló?_
+
+🤔 ... 💡
+
+  ErrFailedPayment = fmt.Errorf("payment failed. Amount: %v, amount)
+
+*PERO* 😐
+
+La descripción del error puede cambiar en cualquier momento y romper todo.
+
+* 2. Error types
+
+*ErrFailedPayment* implementa la interface error-
+
+.play -edit ./resources/src/14_errors/3/main.go  /START/,/END/
+
+* Desventajas de Error types
+
+- Los tipos de error deben ser públicos.
+- Acoplamiento fuerte de quien llama, creando una API frágil.
+
+*Mantener* *el* *contrato*. _Ya_no_podemos_cambiar_estructura_o_nombres_de_attributos_.
+
+.image ./resources/contract.gif
+
+* Errores opacos
+
+Tipos de errores internos que no generan acoplamiento.
+
+Ocurrió un error, pero no se puede ver dentro del error.
+
+  package procesing
+
+  type PaymentErr interface {
+      IsPaymentErr() (bool, string)
+  }
+
+  type paymentErr string
+  func (e paymentErr) Error() string { return "payment failed" }
+  func (e paymentErr) IsPaymentErr() (bool, string) { return true, string(e) }
+
+  func HandlePayment() error {
+      return paymentErr("100.000")
+  }
+
+* Errores opacos - assert
+
+- Assert errors por comportamiento, no por tipo.
+
+  // PaymentErr returns true if err is for a failed payment with the amount.
+  func PaymentErr(err error) (bool, string) {
+      if e, ok := err.(procesing.PaymentErr); ok {
+          return e.IsPaymentErr()
+      }
+      return false, ""
+  }
+
+  func main() {
+      err := procesing.HandlePayment()
+      if ok, amount := PaymentErr(err); ok {
+          fmt.Printf("payment failed. Amount: %v", amount)
+      }
+  }
+
+* Don’t just check errors, handle them gracefully
+
+  func AuthenticateRequest(r *Request) error {
+        err := authenticate(r.User)
+        if err != nil {
+                return err
+        }
+        return nil
+  }
+
+AuthenticateRequest devolverá el error a su caller, que probablemente hará lo mismo, etc. Luego Main imprimirá el error, y todo lo que se imprimirá es:
+
+.image ./resources/err_no_such.png 200 _
+
+Buena suerte encontrando la causa.
+
+* Agregar Contexto 💡
+
+Una forma de solucionar el problema es simplemente crear un nuevo error
+
+  func AuthenticateRequest(r *Request) error {
+        err := authenticate(r.User)
+        if err != nil {
+                return fmt.Errorf("authenticate failed: %v", err)
+        }
+        return nil
+  }
+
+¿Posibles Desventajas? 🤔
+ .
+ ..
+ ...
+ ....
+
+* Envolver los errores
+
+A veces necesitamos acceder al error original y agregar contexto al mismo tiempo.
+
+  type Error struct {
+      message string
+      err error
+  }
+  func (e *Error) Error() string {
+      return fmt.Sprintf("%s: %v", e.message, e.err)
+  }
+  func Wrap(cause error, message string) error {
+      return &Error{err: cause, message: message}
+  }
+
+Pero necesitamos una forma de acceder al error original.
+
+  type Causer interface {
+      Cause() error
+  }
+  func (e *Error) Cause() error { return e.err }
+
+* Muy bien, herramientas!
+
+.link https://godoc.org/github.com/pkg/errors github.com/pkg/errors
+
+  // Wrap annotates cause with a message.
+  func Wrap(cause error, message string) error
+
+Wrap, toma un error, y un mensaje y produce un nuevo error.
+
+  // Cause unwraps an annotated error.
+  func Cause(err error) error
+
+Cause, toma un error que posiblemente haya sido wrapped, y lo desenvuelve para recuperar el error original
+
+* Envolver
+
+  func ReadConfig() ([]byte, error) {
+        home := os.Getenv("HOME")
+        config, err := ReadFile(filepath.Join(home, ".settings.xml"))
+        return config, errors.Wrap(err, "could not read config")
+  }
+  func main() {
+        _, err := ReadConfig()
+        if err != nil {
+                fmt.Println(err)
+                os.Exit(1)
+        }
+  }
+
+Con contexto 😏
+
+  could not read config: open /Users/dfc/.settings.xml: no such file or directory
+
+Con *errors.Print(err)*
+
+  readfile.go:27: could not read config
+  open /Users/dfc/.settings.xml: no such file or directory
+
+* Causa
+
+  // PaymentErr returns true if err is for a failed payment with the amount.
+  func PaymentErr(err error) (bool, string) {
+      if e, ok := errors.Cause(err).(procesing.PaymentErr); ok {
+          return e.IsPaymentErr()
+      }
+      return false, ""
+  }
+
+Siempre que se necesite verificar que un error coincida con un valor o tipo específico, primero se debe recuperar el error original.
+
+* Defer
+
+Difiere la ejecución de una función hasta que la función que la contiene retorna.
+
+- Los argumentos de una función diferida son evaluados al momento de evaluar la sentencia defer.
+- Las llamadas a funciones diferidas son ejecutadas siguiendo un orden LIFO luego de que la función que las contiene devuelve el control.
+
+.play -edit ./resources/src/15_defer/main.go   /START/,/END/
+
+Se usa comúnmente para simplificar las funciones que realizan varias acciones de limpieza.
+
+* Ejemplo Defer
+
+  func CopyFile(dstName, srcName string) (written int64, err error) {
+    src, err := os.Open(srcName)
+    if err != nil {
+        return
+    }
+
+    dst, err := os.Create(dstName)
+    if err != nil {
+        return
+    }
+
+    written, err = io.Copy(dst, src)
+    dst.Close()
+    src.Close()
+    return
+  }
+
+Esto funciona, pero hay un error.
+
+¿Dónde está? 🕵️‍
+
+* Ejemplo Defer - fixed
+
+  func CopyFile(dstName, srcName string) (written int64, err error) {
+    src, err := os.Open(srcName)
+    if err != nil {
+        return
+    }
+    defer src.Close()
+
+    dst, err := os.Create(dstName)
+    if err != nil {
+        return
+    }
+    defer dst.Close()
+
+    return io.Copy(dst, src)
+  }
+
+*Defer* nos permite cerrar cada archivo inmediatamente después de abrirlo, garantizando que, independientemente del número de declaraciones devueltas en la función, los archivos se cerrarán.
+
+.link https://github.com/ifreddyrondon/capture/blob/master/features/capture/capture_controller_test.go#L35 Ejemplo de limpieza
+
+* Panic y Recover
+
+Las instrucciones *panic()* y *recover()* son similares a lanzar y capturar una excepción en otros lenguages.
+
+*panic()* _debe_ser_usado_únicamente_donde_el_error_es_irrecuperable_y_no_tiene_sentido_que_la_ejecución_normal_del_código_prosiga._
+
+.play -edit ./resources/src/16_recover/1/main.go  /START/,/END/
+
+Cuando una función F() llama a panic(), se frena la ejecución de F, todas las funciones diferidas son ejecutadas normalmente y luego F() retorna al cliente que la invoca. Para el cliente, F() se comporta como una llamada a panic().
+
+[[https://about.sourcegraph.com/blog/go-when-is-it-ok-to-recover][When it is ok to recover?]]
+
+* Panic y Recover
+
+.play -edit ./resources/src/16_recover/2/main.go /START OMIT/,/END OMIT/
+
+* Concurrencia
+
+Las primitivas de Go para manejar concurrencia hacen que los programas con múltiples subprocesos simultáneos sean simples.
+
+- Una *goroutine* es una función que se ejecuta concurrentemente con otro código.
+- Cada programa de Go tiene al menos una goroutine ("main() goroutine") que es creada y ejecutada automáticamente cuando el proceso comienza.
+
+.image ./resources/gopherutine.jpeg 200 _
+
+.caption [[https://medium.com/@trevor4e/learning-gos-concurrency-through-illustrations-8c4aff603b3][Learning Go’s Concurrency Through Illustrations]]
+
+* Single-threaded
+
+.image ./resources/gopherutine2.jpeg 300 _
+
+* Mina de oro Single-threaded
+
+.play -edit ./resources/src/17_gorutines/1/main.go /START OMIT/,/END OMIT/
+
+* Goroutine
+
+.image ./resources/gopherutine1.jpeg 200 _
+.play -edit ./resources/src/17_gorutines/2/main.go /START OMIT/,/END OMIT/
+.play -edit ./resources/src/17_gorutines/3/main.go /START OMIT/,/END OMIT/
+
+* Comunicación entre goroutines
+
+🧙‍ Bienvenidos al mundo mágico de los canales.
+
+.image ./resources/channels.jpeg 200 _
+
+Un channel en Golang es un tipo de dato, un conducto, que nos permite enviar y recibir mensajes a través de él.
+
+.image ./resources/channels2.jpeg 200 _
+
+* Channels
+
+  myFirstChannel := make(chan string)
+
+El operador <- nos permite enviar información a un channel:
+
+.image ./resources/channels3.jpeg 200 _
+
+  sChannel <- "hello"
+
+y recibir información desde él:
+
+  var s string = <- sChannel
+
+* Channels Blocking
+
+los channels son bloqueantes, es decir, cada vez que agregamos información a un channel el emisor se bloquea hasta que un receptor toma el mensaje del conducto. Esto los hace una excelente herramienta para sincronizar goroutines sin un mecanismo de lock especifico.
+
+Blocking on a Send
+.image ./resources/channels4.jpeg 100 _
+
+Blocking on a Receive
+.image ./resources/channels5.jpeg 100 _
+
+* Channels synchronization
+
+.play -edit ./resources/src/19_channels/synchronization/basic/main.go  /START OMIT/,/END OMIT/
+
+* Multi-threaded
+
+.image ./resources/channels6.jpeg 200 _
+
+.image ./resources/gopherutine3.jpeg 300 _
+
+* Mina de oro Multi-threaded
+
+.play -edit ./resources/src/19_channels/main.go /START OMIT/,/END OMIT/
+
+* Tamaño de los Channels
+
+Hemos estado usando *unbuffered* *Channels*. Solo una parte de los datos pasa por el canal a la vez.
+
+.image ./resources/unbuffered_channel.jpeg 120 _
+
+Cuando se crea un channel se le puede asignar un tamaño dando lugar a un *buffered* *Channel*:
+
+.image ./resources/buffered_channel.jpeg 120 _
+
+  var sChannel chan string = make(chan string, 100)
+
+* Channels con buffer
+
+en estos casos el emisor sólo se bloqueará cuando el buffer esté lleno y el receptor cuando esté vacío.
+
+Útiles cuando
+
+- El número de goroutines a ser lanzando es conocido.
+- Se quiere limitar el número de goroutines que van a ser lanzadas o la cantidad de trabajo encolado.
+
+En la mina, podríamos encontrarnos con una situación en la que el *finder* puede encontrar 3 piezas de oro en el tiempo que le toma al *miner* procesar una pieza de oro. Para no dejar al *finder* bloqueado esperando para enviar un poco más de oro hasta que termine, se puede usar un canal con búfer.
+
+.image ./resources/channels7.jpeg 125 _
+
+* Channels con buffer 1
+
+.play -edit ./resources/src/19_channels/buffered/main.go
+
+* Channels con buffer 2
+
+.play -edit ./resources/src/19_channels/buffered/ex2.go
+
+* Channels con buffer 3
+
+.play -edit ./resources/src/19_channels/buffered/ex3.go
+
+* Sincronización entre canales
+
+Podemos leer de un canal de manera no bloqueante con *select*.
+
+La goroutine leerá del canal si hay algo allí o ejecutará el default.
+
+.play -edit ./resources/src/19_channels/synchronization/select/main.go /START OMIT/,/END OMIT/
+
+* WaitGroup
+
+.play -edit ./resources/src/18_wait_group/main.go
+
+* Construyendo APIs en Go
+
+*Standard* *Library*
+
+El paquete *"net/http"* contiene todas las utilidades necesarias para aceptar solicitudes y manejarlas dinámicamente.
+
+Se puede registrar un handler con la función http.HandleFunc. El primer parámetro toma una ruta y el segundo una función para ejecutarse.
+
+.code ./resources/src/20_web_server/1/main.go /START OMIT/,/END OMIT/
+
+* Handlers
+
+.code ./resources/src/20_web_server/2/main.go /START OMIT/,/END OMIT/
+
+* Get y Post
+
+.code ./resources/src/20_web_server/3/main.go /START OMIT/,/END OMIT/
+
+* Opciones
+
+- [[https://github.com/go-chi/chi][*Martini*]]: Framework web -> @deprecated
+- [[https://github.com/go-martini/martini][*Martini*]]: Framework web -> @deprecated
+- [[https://gin-gonic.github.io/gin/][*Gin-Gonic*]]: Framework web -> Basado en Martini 10x mas performante
+- [[http://beego.me/][*Beego*]]: Framework web -> Templates & ORM
+- [[https://gokit.io/][*gokit*]]: A standard library for microservices.
+- [[http://www.gorillatoolkit.org/][*Gorilla*]]: Web toolkit.
+- [[https://gobuffalo.io/en/][*Buffalo*]]: Web development eco-system.
+- [[https://golang.org/pkg/net/http][*net/http*]]: Libreria http estandar de go
+- ….
+
+* chi
+
+.image ./resources/chi.png
+
+* ¿Por qué chi? ¿Por qué no biblioteca estándar?
+
+- 100% compatible con *net/http*: puede usar cualquier paquete de http o middleware en el ecosistema que también sea compatible con net/http
+- Diseñado para las API modulares: middlewares, middlewares en línea, grupos de rutas y montaje de sub routers.
+- Sin dependencias externas: solo Go 1.7+ stdlib + net/http
+- Productivo en Pressly, CloudFlare, Heroku, 99Designs, ...
+- Muy muy rapido.
+- No reinventar la rueda
+- Había que elegir uno :)
+
+Mi favorito es que los mismos handlers http y middleware que escribirías para otros routers compatibles con net/http también funcionarían aquí.
+
+* Ejemplo: Ping
+
+.code ./resources/src/21_chi/1/main.go
+
+* Métodos http soportados
+
+    Connect(pattern string, h http.HandlerFunc)
+    Delete(pattern string, h http.HandlerFunc)
+    Get(pattern string, h http.HandlerFunc)
+    Head(pattern string, h http.HandlerFunc)
+    Options(pattern string, h http.HandlerFunc)
+    Patch(pattern string, h http.HandlerFunc)
+    Post(pattern string, h http.HandlerFunc)
+    Put(pattern string, h http.HandlerFunc)
+    Trace(pattern string, h http.HandlerFunc)
+
+    NotFound(h http.HandlerFunc)
+
+* Params
+
+.code ./resources/src/21_chi/2/main.go
+
+* TODO API
+
+* Thanks
+
+.image ./resources/micdrop.jpg 500 _
